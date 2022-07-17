@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script type="text/json"
+        src="https://cdn.jsdelivr.net/npm/@1inch/limit-order-protocol@1.3.0/abi/LimitOrderProtocol.json"></script>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.3.6/dist/web3.min.js" type="text/javascript"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+    <script src="https://unpkg.com/js-big-decimal@1.3.1/dist/web/js-big-decimal.min.js"></script>
+
+    <script async>
+
+        // erc20 abi
+        const erc20abi = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"burn","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"subtractedValue","type":"uint256"}],"name":"decreaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"getOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"addedValue","type":"uint256"}],"name":"increaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_tokenContract","type":"address"},{"internalType":"uint256","name":"_amount","type":"uint256"}],"name":"withdrawToken","outputs":[],"stateMutability":"nonpayable","type":"function"}]
+        function sleep(ms)
+        {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+
+        $(() => {
+            
+
+            $('#submit').on('click', (e) => {
+                e.preventDefault(); //*CRITICAL* : this "catches" the form submit event and stops it
+                function driver() {
+                    let fromToken = $('#from-token').val();
+                    let toToken = $('#to-token').val();
+                    let userInput = $('#user-input').val();
+                    let minBlock = $('#min-block').val();
+                    let maxBlock = $('#max-block').val();
+                    let poolAddress = $('#pool-address').val();
+                    let RPC = $('#RPC').val();
+
+                    if (fromToken == "" || toToken == "" || userInput == "" || minBlock == "" || maxBlock == "" || poolAddress == "" || RPC == "") {
+                        alert("Please fill in all fields");
+                        return;
+                    }
+                    else{
+                        getHistoricRates(fromToken, toToken, userInput, minBlock, maxBlock, poolAddress, RPC);
+                    }
+                }
+                
+                async function getHistoricRates(fromToken, toToken, userInput, minBlock, maxBlock, poolAddress, rpcUrl)
+                {
+                    // print parameters to console
+                    console.log("fromToken: " + fromToken);
+                    console.log("toToken: " + toToken);
+                    console.log("userInput: " + userInput);
+                    console.log("minBlock: " + minBlock);
+                    console.log("maxBlock: " + maxBlock);
+                    console.log("poolAddress: " + poolAddress);
+                    console.log("rpcUrl: " + rpcUrl);
+
+                    const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
+                    let rates = [];
+                    const erc20_1 = new web3.eth.Contract(erc20abi, fromToken, web3.currentProvider);
+                    const erc20_2 = new web3.eth.Contract(erc20abi, toToken, web3.currentProvider);
+                    const fromTokenDecimals = await erc20_1.methods.decimals().call();
+                    //the rate limit is 300 calls per minute for morails speedy nodes.
+                    let startDate = new Date();
+                    let counter = 0;
+                    let ratesTable = "";
+
+                    for(let i = minBlock; i <= maxBlock; i++) {
+                        //console.log("Block: " + i);
+                        
+                        // if we hit a divisor of 300, wait until the next minute
+                        if(counter % 300 == 0 && counter != 0) {
+                            let endDate = new Date();
+                            let diff = endDate - startDate;
+                            let minutes = Math.floor(diff / 60000);
+                            let seconds = Math.floor((diff % 60000) / 1000);
+                            let timeToWait = 60 - seconds;
+                            console.log("waiting " + timeToWait + " seconds");
+                            await sleep(timeToWait * 1000);
+                            startDate = new Date(); 
+                        } 
+                        try {
+                            const fromTokenBalance = await erc20_1.methods.balanceOf(poolAddress).call(null, i);
+                            const toTokenBalance = await erc20_2.methods.balanceOf(poolAddress).call(null, i);
+                            //console.log("Block: " + i + " From Token Balance: " + fromTokenBalance + " To Token Balance: " + toTokenBalance);
+                            const amount = (new bigDecimal(userInput).multiply(new bigDecimal("1.0e" + fromTokenDecimals.toString()))).value; // for some reason the bigDecimal library is off by 2 on exponents
+                            const rate = new bigDecimal(toTokenBalance).divide(new bigDecimal(fromTokenBalance));
+                            const numerator = ethers.BigNumber.from(amount).mul(ethers.BigNumber.from(toTokenBalance).mul(997)); //ethers.BigNumber.from(fromTokenBalance) // //
+                            const denominator = ethers.BigNumber.from(fromTokenBalance).mul(1000).add(ethers.BigNumber.from(amount).mul(997)); //ethers.BigNumber.from(toTokenBalance)  // //
+                            //console.log("Numerator " + numerator + " Denominator " + denominator + " Rate " + (parseInt(ethers.BigNumber.from(numerator.mul(1000000)).div(denominator)).toString())/1000000);
+                            const Expected = ethers.utils.formatUnits(numerator.div(denominator)); 
+                            // const Expected = (new bigDecimal(userInput)).multiply(new bigDecimal(rate.value)).value
+                            rates.push({ 'numerator': ethers.utils.formatUnits(numerator), "denomonator": ethers.utils.formatUnits(denominator), "k": rate, "expected":Expected, 'block': i}); //'amountFrom': ethers.utils.formatUnits(amount),
+                            console.log(JSON.stringify(rates[i%minBlock]));
+                            ratesTable += "<tr><td>" + i 
+                                // + "</td><td>" + ethers.utils.formatUnits(numerator) 
+                                // + "</td><td>" + ethers.utils.formatUnits(denominator) 
+                                    + "</td><td>" + Expected + "</td></tr>";
+
+                        } 
+                        catch(e) {
+                            console.log("error, waiting", e);
+                            i--;
+                            let endDate = new Date();
+                            let diff = endDate - startDate;
+                            let minutes = Math.floor(diff / 60000);
+                            let seconds = Math.floor((diff % 60000) / 1000);
+                            let timeToWait = 60 - seconds;
+                            // console.log("waiting " + timeToWait + " seconds");
+                            await sleep(timeToWait * 1000);
+                            startDate = new Date();
+                        }
+                    }
+                    //console.log(ratesTable);
+                    $('#rates-table').html(ratesTable);
+                }
+
+
+                driver();
+            });
+
+        })
+
+
+
+    </script>
+
+
+
+</head>
+
+<body>
+
+    <h1>Get Historic Uniswap v2 (and fork) rates</h1>
+
+    <pre>
+----------------------------------------------------------- 
+This will get the historic uniswap v2 (and forks) rates for a given token.
+
+Just add your archival RPC, the user's input amount, min block, max block, the source token address and lastly, the pool address. 
+The output will be a list of historic rates and what the user should've expected. 
+----------------------------------------------------------- 
+</pre>
+
+    <br>
+    <form>
+        <div class="form-group">
+            <label for="from-token">From Token</label>
+            <input type="text" class="form-control" id="from-token" placeholder="0x..." value="0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2">
+        </div>
+        <div class="form-group">
+            <label for="to-token">To Token</label>
+            <input type="text" class="form-control" id="to-token" placeholder="0x..." value="0xFca59Cd816aB1eaD66534D82bc21E7515cE441CF">
+        </div>
+        <div class="form-group">
+            <label for="user-input">User Input</label>
+            <input type="text" class="form-control" id="user-input" placeholder="0.00" value="4.584962">
+        </div>
+        <div class="form-group">
+            <label for="min-block">Min Block</label>
+            <input type="text" class="form-control" id="min-block" placeholder="0" value="15155643">
+        </div>
+        <div class="form-group">
+            <label for="max-block">Max Block</label>
+            <input type="text" class="form-control" id="max-block" placeholder="0" value="15155643">
+        </div>
+        <div class="form-group">
+            <label for="pool-address">Pool Address</label>
+            <input type="text" class="form-control" id="pool-address" placeholder="0x..." value="0x86fef14c27c78deaeb4349fd959caa11fc5b5d75">
+        </div>
+        <div class="form-group">
+            <label for="RPC">RPC</label>
+            <input type="text" class="form-control" id="RPC" placeholder="http://localhost:8545" value="https://mainnet.infura.io/v3/a97109b45dfc4801894f4fb43dcef549">
+        </div>
+        <button type="button" class="btn btn-primary" id="submit">Submit</button>
+
+    </form>
+
+    <br>
+    <hr>
+    <!-- table containing the numerator, denomonator, "k", and what you should expect based on the input -->
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th scope="col">Block #</th>
+                <!-- <th scope="col">Numerator</th>
+                <th scope="col">Denominator</th> -->
+                <th scope="col">Expected output</th>
+            </tr>
+        </thead>
+        <tbody id="rates-table">
+        </tbody>
+    </table>
+
+</body>
+
+
+<style>
+    /* evenly space the form in a grid within 350 px*/
+    .form-group {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-gap: 10px;
+        min-width: 350px;
+        max-width: 800px;
+    }
+
+    table, th, td{
+        width: 100%;
+        /* standard table grid borders */
+        border: 1px solid black;
+    }
+    table {
+        border-collapse: collapse;
+    }
+    th, td {
+        padding: 15px;
+        text-align: left;
+        width: 50px;
+    }
+</style>
+
+</html>
